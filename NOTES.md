@@ -1,6 +1,12 @@
 # Raspberry Pi Pico 2W
 Some experiments.
 
+# TODO
+
+ * Understand the boot process
+
+ * Put a blink program in boot2?
+
 
 # On mac; install GCC for both ARM and RISC-V
 `brew install --cask gcc-arm-embedded`
