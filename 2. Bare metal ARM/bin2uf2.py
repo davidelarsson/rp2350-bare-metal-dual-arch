@@ -43,16 +43,24 @@ def convert_to_uf2(data, base_addr=0x10000000):
     return bytes(uf2_data)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <input.bin> <output.uf2>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print(f"Usage: {sys.argv[0]} <input.bin> <output.uf2> [base_address]")
+        print(f"  base_address: Flash=0x10000000 (default), RAM=0x20000000")
         sys.exit(1)
+    
+    # Parse base address if provided
+    base_addr = 0x10000000  # Default to flash
+    if len(sys.argv) == 4:
+        base_addr = int(sys.argv[3], 0)  # Supports 0x hex format
     
     with open(sys.argv[1], 'rb') as f:
         data = f.read()
     
-    uf2 = convert_to_uf2(data)
+    uf2 = convert_to_uf2(data, base_addr)
     
     with open(sys.argv[2], 'wb') as f:
         f.write(uf2)
     
+    target = "RAM" if base_addr >= 0x20000000 else "Flash"
     print(f"Converted {len(data)} bytes to UF2 ({len(uf2)} bytes, {len(uf2)//512} blocks)")
+    print(f"Target: {target} at 0x{base_addr:08x}")

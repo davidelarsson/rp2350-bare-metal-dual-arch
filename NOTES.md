@@ -6,6 +6,7 @@ Some experiments.
  * Understand the boot process
 
  * Put a blink program in boot2?
+  - Doesn't exist anymore in RP2350!
 
 
 # On mac; install GCC for both ARM and RISC-V

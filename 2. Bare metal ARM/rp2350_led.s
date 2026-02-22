@@ -1,14 +1,13 @@
-// Bare-metal RP2350 with proper IMAGE_DEF metadata
-// No boot2 required! RP2350 bootrom sets up XIP automatically
 
-	.syntax unified
-	.cpu cortex-m33
-	.thumb
+	.syntax unified		// Modern unified syntax (there's an older "divided"
+						//syntax but unified is more common now)
+	.cpu cortex-m33		// Target Cortex-M33 core (RP2350)
+	.thumb				// Irrelevant for Cortex-M but good practice to specify Thumb mode explicitly
 
 	// IMAGE_DEF metadata block (must be in first 4KB)
-	.section .image_def, "a"
-	.align 2
-	.global image_def
+	.section .image_def, "a"	// "a" = allocatable (will be loaded into RAM by bootrom)
+	.align 2			// Align to 4 bytes (32-bit words)
+	.global image_def	// Make symbol global for bootrom to find
 image_def:
 	.word 0xffffded3       // PICOBIN_BLOCK_MARKER_START
 	.word 0x10210142       // IMAGE_TYPE: Arm, Secure, EXE, RP2350
@@ -17,8 +16,8 @@ image_def:
 	.word 0xab123579       // PICOBIN_BLOCK_MARKER_END
 
 	// Vector table (bootrom will use this since no explicit entry point)
-	.section .vectors, "ax"
-	.align 8
+	.section .vectors, "ax"		// "a" = allocatable, "x" = executable
+	.align 8			// Align to 8 bytes (64-bit) for Cortex-M33 vector table
 	.global _vectors
 _vectors:
 	.word 0x20082000      // Initial Stack Pointer
