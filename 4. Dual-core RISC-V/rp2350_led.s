@@ -69,6 +69,17 @@ core0_init:
     li s3, 0x20040000      # Core 1 stack pointer
     li s4, 0               # Sequence counter
 
+# Datasheet 5.3. Launching code on Processor Core 1
+# Send:
+# seq 0: 0
+# seq 1: 0
+# seq 2: 1
+# seq 3: vector table address (used to set mtvec on core 1)
+# seq 4: initial stack pointer
+# seq 5: entry point address
+#
+# vtvec: Machine Trap-Vector Base Address Register
+# CSR = Control and Status Register
 launch_loop:
     # Determine which value to send based on sequence counter
     li t2, 0
@@ -192,10 +203,10 @@ core1_blink_loop:
     
     j core1_blink_loop
 
-# CORE 1: Vector table (required by boot ROM)
+# CORE 1: Vector table (exception handlers - bootrom sets mtvec to this)
 .align 4
 core1_vector_table:
-    j core1_entry          # Exception handler 0 (entry point)
+    j core1_entry          # Exception handler 0
     .word 0                # Exception handler 1
     .word 0                # Exception handler 2
     .word 0                # Exception handler 3
