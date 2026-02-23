@@ -1,9 +1,13 @@
 .section .image_def, "a"
     .word 0xffffded3  # BLOCK_MARKER_START
     .word 0x11010142  # IMAGE_TYPE: RISC-V executable for RP2350 (1 word)
+
+                      # Note that the following three words are not used in the ARM
+                      # IMAGE_DEF; ARM has a vector table that contains this info instead.
     .word 0x00000344  # ENTRY_POINT item (type=0x44, size=3 words)
     .word _start      # Entry PC (will be resolved by linker)
     .word 0x20042000  # Stack pointer
+
     .word 0x000004ff  # LAST item (type=0xff, size=4 words total for all items)
     .word 0x00000000  # Next block pointer (0 = link to self)
     .word 0xab123579  # BLOCK_MARKER_END
@@ -57,7 +61,7 @@ blink_loop:
 
 # Delay function - approximately 1 second
 delay:
-    li t2, 10000000         # Delay count (~1 second)
+    li t2, 5000000         # Delay count (~1 second)
 delay_loop:
     addi t2, t2, -1
     bnez t2, delay_loop
