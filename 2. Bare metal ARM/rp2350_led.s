@@ -1,10 +1,14 @@
 
 	.syntax unified		// Modern unified syntax (there's an older "divided"
-						//syntax but unified is more common now)
+						// syntax but unified is more common now)
 	.cpu cortex-m33		// Target Cortex-M33 core (RP2350)
 	.thumb				// Irrelevant for Cortex-M but good practice to specify Thumb mode explicitly
 
 	// IMAGE_DEF metadata block (must be in first 4KB)
+	// .section is passed to the linker, so we can define custom sections for
+	// the bootrom to find
+	// .global makes the symbol visible to the outside (not used in this case
+	// but good practice for clarity)
 	.section .image_def, "a"	// "a" = allocatable (will be loaded into RAM by bootrom)
 	.align 2			// Align to 4 bytes (32-bit words)
 	.global image_def	// Make symbol global for bootrom to find
@@ -28,7 +32,7 @@ _vectors:
 	// Application code
 	.section .text, "ax"
 	.align 2
-	.global _reset
+	//.global _reset
 	.thumb_func
 _reset:
 	// Set up stack pointer

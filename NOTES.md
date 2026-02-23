@@ -46,3 +46,14 @@ You can run the first example again, but this time add:
 To the CMake command. This will build the example using the RISC-V cores instead.
 
 
+# 2. Bare metal ARM
+`2. Bare metal ARM` blinks an LED on GPIO15 using bare metal code.
+
+Two versions are included, one for Flash, the other for SRAM that disappears after a power cycle.
+
+
+# 3. Bare metal RISC-V
+`3. Bare metal RISC-V` works the same as 2, but using the RISC-V CPU instead.
+
+
+
