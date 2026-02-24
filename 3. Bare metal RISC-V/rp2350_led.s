@@ -12,12 +12,32 @@
     .word 0x00000000  # Next block pointer (0 = link to self)
     .word 0xab123579  # BLOCK_MARKER_END
 
+# RISC-V gotchas
+#
+# lw/sw are load/store *words*, which means 4 bytes in RISC-V terminology!
+#
+# t0-t6 (x5-x7, x28-x31) are temporary registers by convention, meaning the
+# caller should not expect them to be preserved across function calls.
+# If we were to preserve values across calls, use s0-s11 (x8-x27) instead.
+#
+# `li` is a pseudo-instruction! A small value (that fits in 12 bits):
+# li t1, 5 
+# # becomes:
+# addi t1, x0, 5
+# A large value (that doesn't fit in 12 bits):
+# li t0, 0x40020000
+# # becomes:
+# lui t0, 0x40020      # Note that t0 is hard-wired to zero!
+# An even larger value (that doesn't fit in 20 bits):
+# li t0, 0x40038040
+# # becomes:
+# lui t0, 0x40038   # lui = load upper immediate, which loads the top 20 bits and sets the bottom 12 bits to 0
+# addi t0, t0, 0x40 # addi = add immediate, which adds the 12-bit immediate to the value in t0
 .section .text, "ax"
 .global _start
 _start:
     # Initialize stack pointer
     li sp, 0x20042000
-
     # Release IO_BANK0 and PADS_BANK0 from reset
     li t0, 0x40020000      # RESETS_BASE (correct address!)
     lw t1, 0(t0)           # Read RESET register
