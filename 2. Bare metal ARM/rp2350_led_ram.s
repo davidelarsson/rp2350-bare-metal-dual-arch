@@ -76,7 +76,7 @@ _blink_loop:
 
 // Delay function
 _delay:
-	ldr  r2, =10000000
+	ldr  r2, =2000000
 _delay_loop:
 	subs r2, r2, #1
 	bne  _delay_loop

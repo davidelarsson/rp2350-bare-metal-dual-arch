@@ -1,7 +1,10 @@
 # RP2350 Bare-Metal LED Blink
 A minimal bare-metal assembly program that blinks an LED on GPIO15 for the Raspberry Pi Pico 2W (RP2350).
 
-There are two versions, one for Flash (default) and one for SRAM. The flash version blinks GPIO15 about twice per second and the SRAM version once per several seconds. This makes it easy to distinguish which one is currently running.
+There are two versions, one for Flash (default) and one for SRAM. The flash version blinks GPIO15 about once per two seconds or so and the SRAM version about twice per second. This makes it easy to distinguish which one is currently running.
+
+Flash version is slow.
+SRAM version is fast.
 
 There is a `bin2uf2.py` script that creates an `UF2` file that can be recognized by the RP2350.
 
