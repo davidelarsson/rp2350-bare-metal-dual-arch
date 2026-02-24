@@ -16,6 +16,15 @@
 .global _start
 _start:
     # Check which core we are
+    #
+    # Hart (HARdware Thread) is RISC-V terminology for a CPU core. Hart 0 = Core 0, etc.
+    #
+    # RISC-V has special CSRs (Control and Status Register) for system control that are
+    # not memory-mapped. We read the mhartid CSR to determine which core we are on.
+    #
+    # csrr is a pseudo-instrution that reads a CSR into a register. Here we read mhartid into t0.
+    # Assembles to: `csrrs t0, mhartid, x0` that means "read and clear bits that are set in x0"
+    # x0 is always zero!
     csrr t0, mhartid
     bnez t0, core1_entry   # If core 1, branch to core 1 code
     
