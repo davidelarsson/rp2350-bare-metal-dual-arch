@@ -55,7 +55,7 @@ image_def_first:
     .word 0xffffded3  # BLOCK_MARKER_START
     .word 0x11010142  # IMAGE_TYPE: RISC-V executable
     .word 0x00000344  # ENTRY_POINT item (type=0x44, size=3 words)
-    .word first_entry # Entry PC for first IMAGE_DEF
+    .word first_entry # Entry PC - stays HIGH
     .word 0x20042000  # Stack pointer
     .word 0x000004ff  # LAST item (type=0xff, size=4 words total)
     .word image_def_second - image_def_first  # BYTE offset to next block
@@ -66,17 +66,16 @@ image_def_second:
     .word 0xffffded3  # BLOCK_MARKER_START
     .word 0x11010142  # IMAGE_TYPE: RISC-V executable
     .word 0x00000344  # ENTRY_POINT item (type=0x44, size=3 words)
-    .word first_entry # Entry PC for second IMAGE_DEF
+    .word second_entry # Entry PC - blinks
     .word 0x20042000  # Stack pointer
     .word 0x000004ff  # LAST item (type=0xff, size=4 words total)
-    .word (image_def_first - image_def_second) & 0xFFFFFFFF  # BYTE offset back (negative, masked)
+    .word (image_def_first - image_def_second) & 0xFFFFFFFF  # BYTE offset back
     .word 0xab123579  # BLOCK_MARKER_END
 
 .section .text, "ax"
 .global first_entry
 first_entry:
-    # FIRST IMAGE_DEF entry point
-    # If this runs, we'll see GPIO15 HIGH
+    # FIRST IMAGE_DEF entry point - stays HIGH
     li sp, 0x20042000
 
     # Release IO_BANK0 and PADS_BANK0 from reset
@@ -108,10 +107,61 @@ first_entry:
     li t1, 0x8000          # Bit 15
     sw t1, 0x38(t0)        # GPIO_OE_SET
 
-    # Set GPIO HIGH
-    li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x8000          # Bit 15
+    # Set GPIO HIGH and stay there
     sw t1, 0x18(t0)        # GPIO_OUT_SET
     
-    # Stay HIGH forever
 1:  j 1b
+
+.global second_entry
+second_entry:
+    # SECOND IMAGE_DEF entry point - blinks
+    li sp, 0x20042000
+
+    # Release IO_BANK0 and PADS_BANK0 from reset
+    li t0, 0x40020000      # RESETS_BASE
+    lw t1, 0(t0)
+    li t2, ~((1 << 6) | (1 << 9))
+    and t1, t1, t2
+    sw t1, 0(t0)
+
+    # Wait for reset done
+    li t0, 0x40020008      # RESET_DONE register
+    li t2, (1 << 6) | (1 << 9)
+1:  lw t1, 0(t0)
+    and t1, t1, t2
+    bne t1, t2, 1b
+
+    # Configure GPIO15 pad
+    li t0, 0x40038040      # PADS_BANK0 + GPIO15
+    li t1, 0x56
+    sw t1, 0(t0)
+
+    # Set GPIO15 function to SIO
+    li t0, 0x4002807c      # IO_BANK0 + GPIO15_CTRL
+    li t1, 5               # Function 5 (SIO)
+    sw t1, 0(t0)
+
+    # Enable GPIO15 output
+    li t0, 0xd0000000      # SIO_BASE
+    li t1, 0x8000          # Bit 15
+    sw t1, 0x38(t0)        # GPIO_OE_SET
+
+# Blink loop
+blink_loop:
+    # Turn LED ON
+    sw t1, 0x18(t0)        # GPIO_OUT_SET
+    call delay
+    
+    # Turn LED OFF
+    sw t1, 0x20(t0)        # GPIO_OUT_CLR
+    call delay
+    
+    j blink_loop
+
+# Delay function
+delay:
+    li t2, 5000000         # ~1 second
+delay_loop:
+    addi t2, t2, -1
+    bnez t2, delay_loop
+    ret
