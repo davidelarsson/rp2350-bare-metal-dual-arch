@@ -15,13 +15,33 @@
 .section .text, "ax"
 .global _start
 _start:
-    # Check which core we are
-    #
     # Hart (HARdware Thread) is RISC-V terminology for a CPU core. Hart 0 = Core 0, etc.
     #
     # RISC-V has special CSRs (Control and Status Register) for system control that are
     # not memory-mapped. We read the mhartid CSR to determine which core we are on.
     #
+    # Core 1 boots into a wait_for_vector function that sleep-waits for relevant data
+    # to be sent from core 0 over the FIFO. When core 1 receives the correct sequence of data,
+    # it will jump to the entry address sent by Core 0. The source of the wait_for_vector
+    # function is documented in https://github.com/raspberrypi/pico-bootrom-rp2350
+    #
+    # How the wakeup sequence works is documented in the RP2350 datasheet
+    # Section 5.3. "Launching code on Processor Core 1", but in C.
+    #
+    # Inter-core communication is done via a FIFO. Core 1 echoes back any data sent by core 0,
+    # so core 0 can verify that core 1 is responding and in sync with the expected sequence.
+    # If for some reason core 1 does not respond with the expected value, core 0 restarts the
+    # sequence from the beginning.
+    #
+    # Hilarious Hazard3 hack:
+    # In order to wake the other core up, you need to execute an `h3.unblock` instruction.
+    # This is mapped to a seemingly random RISC-V opcode that would otherwise be a NOP:
+    # slt x0, x0, x1
+    # Since x0 is always zero, and any writes to it are ignored, this is always a NOP.
+    # However, the RP2350 bootrom treats this instruction as a special signal to unblock
+    # the other core.
+    #
+    # Check which core we are
     # csrr is a pseudo-instrution that reads a CSR into a register. Here we read mhartid into t0.
     # Assembles to: `csrrs t0, mhartid, x0` that means "read and clear bits that are set in x0"
     # x0 is always zero!
@@ -213,6 +233,8 @@ core1_blink_loop:
     j core1_blink_loop
 
 # CORE 1: Vector table (exception handlers - bootrom sets mtvec to this)
+# Not actually used in this test since we don't trigger any exceptions,
+# but required for bootrom to accept the image
 .align 4
 core1_vector_table:
     j core1_entry          # Exception handler 0
