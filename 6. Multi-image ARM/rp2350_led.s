@@ -68,19 +68,19 @@ first_entry:
     cmp r1, r2
     bne 1b
 
-    // Configure GPIO15 pad
-    ldr r0, =0x40038040   // PADS_BANK0 + GPIO15
+    // Configure GPIO25 pad
+    ldr r0, =0x40038068   // PADS_BANK0 + GPIO25
     mov r1, #0x56
     str r1, [r0]
 
-    // Set GPIO15 function to SIO
-    ldr r0, =0x4002807c   // IO_BANK0 + GPIO15_CTRL
+    // Set GPIO25 function to SIO
+    ldr r0, =0x400280cc   // IO_BANK0 + GPIO25_CTRL
     mov r1, #5            // Function 5 (SIO)
     str r1, [r0]
 
-    // Enable GPIO15 output
+    // Enable GPIO25 output
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x38]   // GPIO_OE_SET
 
     // Set GPIO HIGH and stay there
@@ -109,24 +109,24 @@ second_entry:
     cmp r1, r2
     bne 1b
 
-    // Configure GPIO15 pad
-    ldr r0, =0x40038040   // PADS_BANK0 + GPIO15
+    // Configure GPIO25 pad
+    ldr r0, =0x40038068   // PADS_BANK0 + GPIO25
     mov r1, #0x56
     str r1, [r0]
 
-    // Set GPIO15 function to SIO
-    ldr r0, =0x4002807c   // IO_BANK0 + GPIO15_CTRL
+    // Set GPIO25 function to SIO
+    ldr r0, =0x400280cc   // IO_BANK0 + GPIO25_CTRL
     mov r1, #5            // Function 5 (SIO)
     str r1, [r0]
 
-    // Enable GPIO15 output
+    // Enable GPIO25 output
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x38]   // GPIO_OE_SET
 
     // Blink LED
     ldr r4, =0xd0000000   // SIO_BASE
-    ldr r5, =0x8000       // Bit 15
+    ldr r5, =0x02000000   // Bit 25
 
 blink_loop:
     // Turn LED ON

@@ -92,19 +92,19 @@ first_entry:
     and t1, t1, t2
     bne t1, t2, 1b
 
-    # Configure GPIO15 pad
-    li t0, 0x40038040      # PADS_BANK0 + GPIO15
+    # Configure GPIO25 pad
+    li t0, 0x40038068      # PADS_BANK0 + GPIO25
     li t1, 0x56
     sw t1, 0(t0)
 
-    # Set GPIO15 function to SIO
-    li t0, 0x4002807c      # IO_BANK0 + GPIO15_CTRL
+    # Set GPIO25 function to SIO
+    li t0, 0x400280cc      # IO_BANK0 + GPIO25_CTRL
     li t1, 5               # Function 5 (SIO)
     sw t1, 0(t0)
 
-    # Enable GPIO15 output
+    # Enable GPIO25 output
     li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x8000          # Bit 15
+    li t1, 0x02000000      # Bit 25
     sw t1, 0x38(t0)        # GPIO_OE_SET
 
     # Set GPIO HIGH and stay there
@@ -131,19 +131,19 @@ second_entry:
     and t1, t1, t2
     bne t1, t2, 1b
 
-    # Configure GPIO15 pad
-    li t0, 0x40038040      # PADS_BANK0 + GPIO15
+    # Configure GPIO25 pad
+    li t0, 0x40038068      # PADS_BANK0 + GPIO25
     li t1, 0x56
     sw t1, 0(t0)
 
-    # Set GPIO15 function to SIO
-    li t0, 0x4002807c      # IO_BANK0 + GPIO15_CTRL
+    # Set GPIO25 function to SIO
+    li t0, 0x400280cc      # IO_BANK0 + GPIO25_CTRL
     li t1, 5               # Function 5 (SIO)
     sw t1, 0(t0)
 
-    # Enable GPIO15 output
+    # Enable GPIO25 output
     li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x8000          # Bit 15
+    li t1, 0x02000000      # Bit 25
     sw t1, 0x38(t0)        # GPIO_OE_SET
 
 # Blink loop
