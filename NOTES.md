@@ -1,12 +1,50 @@
 # Raspberry Pi Pico 2W
 Some experiments.
 
+
 # TODO
 
- * Understand the boot process
+ * Go through everything and clean it up
 
- * Put a blink program in boot2?
-  - Doesn't exist anymore in RP2350!
+# Overview
+The goal is to run two cores with different architectures simultaneously. This is achieved in examples 8 and 9.
+In order to get there, I went through several steps:
+
+ * `1. Blink LED and print to serial terminal`
+  - Simple LED blinking and terminal output using the SDK and C
+  - This is the only example using the SDK; all others use bare metal assembly coding
+
+ * `2. Bare metal ARM`
+  - Blink an LED using bare-metal coding running ARM assembly
+  - Includes Makefile for SRAM-only load
+
+ * `3. Bare metal RISC-V`
+  - Blink an LED using bare-metal coding running RISC-V assembly
+
+ * `4. Dual-core ARM`
+  - Running ARM assembly code on both cores using bare-metal coding
+
+ * `5. Dual-core RISC-V`
+  - Running RISC-V assembly code on both cores using bare-metal coding
+
+ * `6. Dual-core multi-image ARM`
+  - Useless but interesting example on how `IMAGE_DEF`s work with ARM
+
+ * `7. Dual-core multi-image RISC-V`
+  - Useless but interesting example on how `IMAGE_DEF`s work with RISC-V
+
+ * `8. Dual-architecture, ARM boot on core 0, RISC-V on core 1`
+  - First example of actually running both ARM and RISC-V code simultaneously
+  - ARM boots on core 0, RISC-V runs on core 1
+
+ * `9. Dual-architecture, RISC-V boot on core 0, ARM on core 1`
+  - First example of actually running both ARM and RISC-V code simultaneously
+  - RISC-V boots on core 0, ARM runs on core 1
+
+
+# 1. Blink LED and print to serial terminal
+Simple getting started program.
+
 
 
 # On mac; install GCC for both ARM and RISC-V
