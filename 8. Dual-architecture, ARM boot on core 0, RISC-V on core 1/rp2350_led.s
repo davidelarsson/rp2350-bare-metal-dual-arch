@@ -1,6 +1,6 @@
 // RP2350 Dual-Core ARM Test
-// Core 0: Initialize GPIO15 and launch Core 1
-// Core 1: Blink GPIO15
+// Core 0: Initialize GPIO25 and launch Core 1
+// Core 1: Blink GPIO25
 
 .syntax unified
 .cpu cortex-m33
@@ -81,24 +81,24 @@ core0_init:
     cmp r1, r2
     bne 1b                // Loop until both bits set
 
-    // Configure GPIO15 pad
-    ldr r0, =0x40038040   // PADS_BANK0 + GPIO15
+    // Configure GPIO25 pad
+    ldr r0, =0x40038068   // PADS_BANK0 + GPIO25
     mov r1, #0x56
     str r1, [r0]
 
-    // Set GPIO15 function to SIO
-    ldr r0, =0x4002807c   // IO_BANK0 + GPIO15_CTRL
+    // Set GPIO25 function to SIO
+    ldr r0, =0x400280cc   // IO_BANK0 + GPIO25_CTRL
     mov r1, #5            // Function 5 (SIO)
     str r1, [r0]
 
-    // Enable GPIO15 output
+    // Enable GPIO25 output
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x38]   // GPIO_OE_SET offset
 
     // TEST: Set GPIO HIGH immediately
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x18]   // GPIO_OUT_SET
 
     // Delay
@@ -201,7 +201,7 @@ wait_response:
 
     // Set GPIO HIGH again before resetting Core 1
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x18]   // GPIO_OUT_SET
 
     // Keep it HIGH for a visible duration (same as Core 1's delay)
@@ -272,7 +272,7 @@ core1_main:
 
     // Set GPIO LOW immediately (no delay)
     ldr r4, =0xd0000000   // SIO_BASE
-    ldr r5, =0x8000       // Bit 15
+    ldr r5, =0x02000000   // Bit 25
     str r5, [r4, #0x20]   // GPIO_OUT_CLR
 
     // Stay in endless loop

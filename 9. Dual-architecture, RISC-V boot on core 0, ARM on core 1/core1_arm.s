@@ -32,11 +32,11 @@ core1_entry:
     // Initialize stack pointer for ARM Core 1
     ldr sp, =0x20040000
 
-    // Set GPIO15 LOW
+    // Set GPIO25 LOW
     // SIO_BASE = 0xd0000000
     // GPIO_OUT_CLR offset = 0x20
     ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x8000       // Bit 15
+    ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x20]   // GPIO_OUT_CLR
 
     // Stay in endless loop
