@@ -1,0 +1,237 @@
+// RP2350 Dual-Core ARM Test
+// Core 0: Initialize GPIO15 and launch Core 1
+// Core 1: Blink GPIO15
+
+.syntax unified
+.cpu cortex-m33
+.thumb
+
+// ARM IMAGE_DEF format is different from RISC-V
+// ARM expects vector table immediately after IMAGE_DEF (no VECTOR_TABLE item needed)
+.section .image_def, "a"
+    .word 0xffffded3      // BLOCK_MARKER_START
+    .word 0x10010142      // IMAGE_TYPE: ARM executable for RP2350
+                          // 0x42 = PICOBIN_BLOCK_ITEM_1BS_IMAGE_TYPE
+                          // 0x01 = size (1 word)
+                          // 0x1001 = flags (IMAGE_TYPE_EXE | EXE_CPU_ARM | EXE_CHIP_RP2350)
+    
+    .word 0x000001ff      // LAST item (type=0xff, size=1 word for IMAGE_TYPE only)
+    .word 0x00000000      // LINK: points to self
+    .word 0xab123579      // BLOCK_MARKER_END
+
+// ARM Cortex-M Vector Table
+// First entry is initial stack pointer, second is reset handler
+.section .vectors, "a"
+.align 8
+vector_table:
+    .word 0x20042000      // Initial stack pointer (top of RAM)
+    .word _start + 1      // Reset handler (+1 for Thumb mode)
+    .word 0               // NMI
+    .word 0               // HardFault
+    .word 0               // MemManage
+    .word 0               // BusFault
+    .word 0               // UsageFault
+    .word 0               // Reserved
+    .word 0               // Reserved
+    .word 0               // Reserved
+    .word 0               // Reserved
+    .word 0               // SVCall
+    .word 0               // Debug Monitor
+    .word 0               // Reserved
+    .word 0               // PendSV
+    .word 0               // SysTick
+
+.section .text, "ax"
+.thumb_func
+.global _start
+_start:
+    // Check which core we are on
+    // For ARM, read SIO CPUID register at 0xd0000000
+    ldr r0, =0xd0000000   // SIO_BASE
+    ldr r0, [r0]          // Read CPUID (offset 0x000)
+    cmp r0, #0
+    bne core1_entry       // If core 1, branch to core 1 code
+
+core0_init:
+    // Initialize stack pointer for core 0
+    ldr sp, =0x20042000
+
+    // Release IO_BANK0 and PADS_BANK0 from reset
+    ldr r0, =0x40020000   // RESETS_BASE
+    ldr r1, [r0]          // Read RESET register
+    ldr r2, =~((1 << 6) | (1 << 9))  // Clear bits 6 and 9
+    and r1, r1, r2
+    str r1, [r0]          // Write back
+
+    // Wait for reset done
+    ldr r0, =0x40020008   // RESET_DONE register
+    ldr r2, =((1 << 6) | (1 << 9))
+1:  ldr r1, [r0]
+    and r1, r1, r2
+    cmp r1, r2
+    bne 1b                // Loop until both bits set
+
+    // Configure GPIO15 pad
+    ldr r0, =0x40038040   // PADS_BANK0 + GPIO15
+    mov r1, #0x56
+    str r1, [r0]
+
+    // Set GPIO15 function to SIO
+    ldr r0, =0x4002807c   // IO_BANK0 + GPIO15_CTRL
+    mov r1, #5            // Function 5 (SIO)
+    str r1, [r0]
+
+    // Enable GPIO15 output
+    ldr r0, =0xd0000000   // SIO_BASE
+    ldr r1, =0x8000       // Bit 15
+    str r1, [r0, #0x38]   // GPIO_OE_SET offset
+
+    // TEST: Set GPIO HIGH immediately
+    ldr r0, =0xd0000000   // SIO_BASE
+    ldr r1, =0x8000       // Bit 15
+    str r1, [r0, #0x18]   // GPIO_OUT_SET
+
+    // Delay
+    ldr r0, =10000000
+    bl delay
+
+    // Launch Core 1
+    ldr r4, =0xd0000000   // SIO_BASE
+    ldr r5, =core1_vector_table
+    ldr r6, =core1_entry
+    ldr r7, =0x20040000   // Core 1 stack pointer
+    mov r8, #0            // Sequence counter
+
+// Send handshake sequence to wake core 1
+launch_loop:
+    // Determine which value to send
+    cmp r8, #0
+    beq send_0
+    cmp r8, #1
+    beq send_0
+    cmp r8, #2
+    beq send_1
+    cmp r8, #3
+    beq send_vt
+    cmp r8, #4
+    beq send_sp
+    b send_entry
+
+send_0:
+    // Drain RX FIFO
+    add r0, r4, #0x50     // FIFO_ST
+drain_loop:
+    ldr r1, [r0]
+    tst r1, #1            // Check VLD bit
+    beq drain_done
+    ldr r2, [r4, #0x58]   // Read and discard from FIFO_RD
+    b drain_loop
+drain_done:
+    // Execute SEV (ARM equivalent of h3.unblock)
+    sev
+    mov r2, #0
+    b do_send
+
+send_1:
+    mov r2, #1
+    b do_send
+
+send_vt:
+    mov r2, r5            // vector_table address
+    b do_send
+
+send_sp:
+    mov r2, r7            // stack pointer
+    b do_send
+
+send_entry:
+    mov r2, r6            // entry point (with Thumb bit set)
+    orr r2, r2, #1        // Set bit 0 for Thumb mode
+
+do_send:
+    // Wait for FIFO ready
+wait_ready:
+    ldr r0, [r4, #0x50]   // FIFO_ST
+    tst r0, #2            // Check RDY bit
+    beq wait_ready
+
+    // Send value
+    str r2, [r4, #0x54]   // FIFO_WR
+
+    // SEV after write
+    sev
+
+    // Wait for response
+wait_response:
+    ldr r0, [r4, #0x50]   // FIFO_ST
+    tst r0, #1            // Check VLD bit
+    beq wait_response
+
+    // Read response
+    ldr r3, [r4, #0x58]   // FIFO_RD
+
+    // Compare
+    cmp r2, r3
+    bne reset_seq         // Mismatch, restart
+
+    // Match! Increment sequence
+    add r8, r8, #1
+    cmp r8, #6
+    bne launch_loop       // Continue if not done
+
+    // Core 1 launched successfully!
+core0_main:
+    b core0_main
+
+reset_seq:
+    // Restart handshake
+    mov r8, #0
+    b launch_loop
+
+.thumb_func
+delay:
+    subs r0, r0, #1
+    bne delay
+    bx lr
+
+// CORE 1: Entry point
+.thumb_func
+.align 4
+core1_entry:
+    // Core 1 starts here
+    b core1_main
+
+.thumb_func
+.align 4
+core1_main:
+    // Initialize stack pointer
+    ldr sp, =0x20040000
+
+    // Set GPIO LOW immediately (no delay)
+    ldr r4, =0xd0000000   // SIO_BASE
+    ldr r5, =0x8000       // Bit 15
+    str r5, [r4, #0x20]   // GPIO_OUT_CLR
+
+    // Stay in endless loop
+core1_done:
+    b core1_done
+
+// CORE 1: Vector table
+.align 8
+core1_vector_table:
+    .word 0x20040000      // Initial stack pointer for core 1
+    .word core1_entry + 1 // Reset handler (+1 for Thumb)
+    .word 0               // NMI
+    .word 0               // HardFault
+    .word 0               // MemManage
+    .word 0               // BusFault
+    .word 0               // UsageFault
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+    .word 0
