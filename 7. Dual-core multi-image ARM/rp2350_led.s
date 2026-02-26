@@ -31,7 +31,7 @@ image_def_first:
 .align 8
 vector_table_second:
     .word 0x20042000      // Initial stack pointer
-    .word first_entry + 1 // Reset handler (+1 for Thumb mode)
+    .word second_entry + 1 // Reset handler (+1 for Thumb mode)
     .word 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  // Other vectors
 
 .align 4
