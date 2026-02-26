@@ -69,34 +69,35 @@ _wait_reset:
 	tst  r3, r1           // Test if both bits 6 and 9 are set
 	beq  _wait_reset      // Loop until both are done
 
-	// STEP 3: Configure GPIO15 pad control
+	// STEP 3: Configure GPIO25 pad control
 	// PADS_BANK0_BASE = 0x40038000 (Page 32)
-	// GPIO15 offset = 0x40 (Page 794)
+	// GPIO25 offset = 0x68 (0x04 base + GPIO_number * 4), page 799
 	// Bit 8 (ISO) must be cleared to remove pad isolation
 	// Bit 6 (IE) must be set to enable input
 	// Bit 7 (OD) must be 0 to enable output
-	ldr  r3, =0x40038040  // PADS_BANK0_BASE (0x40038000) + GPIO15 (0x40)
+	ldr  r3, =0x40038068  // PADS_BANK0_BASE (0x40038000) + GPIO25 (0x68)
 	movs r2, #0x56        // Binary: 0101 0110 = IE=1, OD=0, ISO=0,
 					      // DRIVE=01 (4mA), PDE=1, SCHMITT=1, SLEWFAST=0
 	str  r2, [r3, #0]
 
-	// STEP 4: Set GPIO15 function to SIO (Software Controlled I/O)
+	// STEP 4: Set GPIO25 function to SIO (Software Controlled I/O)
 	// IO_BANK0_BASE = 0x40028000 (Page 32)
-	// GPIO15_CTRL Register offset = 0x7C (Page 635)
-	// FUNCSEL bits [4:0] = 0x05 → SIO_15
-	ldr  r3, =0x4002807c  // IO_BANK0_BASE (0x40028000) + GPIO15_CTRL (0x7C)
+	// GPIO25_CTRL Register offset = 0xCC (0x04 base + GPIO_number * 8)
+	// FUNCSEL bits [4:0] = 0x05 → SIO_25
+	ldr  r3, =0x400280cc  // IO_BANK0_BASE (0x40028000) + GPIO25_CTRL (0xCC)
+						  // Page 651 in the datasheet
 	movs r2, #5           // Function 5 = SIO
 	str  r2, [r3, #0]
 
-	// STEP 5: Enable GPIO15 as output and set it high
+	// STEP 5: Enable GPIO25 as output and set it high
 	// SIO_BASE = 0xd0000000 (Page 34)
 	// SIO GPIO_OE_SET offset = 0x038 (set output enable bits, page 65)
 	// SIO GPIO_OUT_SET offset = 0x018 (set output value bits, page 62)
 	// SIO GPIO_OUT_CLR offset = 0x020 (clear output value bits, page 63)
 	
-	// Enable GPIO15 as output
+	// Enable GPIO25 as output
 	ldr  r0, =0xd0000000  // SIO_BASE
-	ldr  r1, =(1 << 15)   // Bit 15 for GPIO15
+	ldr  r1, =(1 << 25)   // Bit 25 for GPIO25
 	str  r1, [r0, #0x038] // GPIO_OE_SET
 
 // Main blink loop

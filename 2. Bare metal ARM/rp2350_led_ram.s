@@ -49,19 +49,19 @@ _wait_reset:
 	tst  r3, r1           // Test both bits
 	beq  _wait_reset      // Loop until done
 
-	// STEP 3: Configure GPIO15 pad
-	ldr  r3, =0x40038040  // PADS_BANK0 + GPIO15
+	// STEP 3: Configure GPIO25 pad
+	ldr  r3, =0x40038068  // PADS_BANK0 + GPIO25
 	movs r2, #0x56        // Clear ISO, set IE
 	str  r2, [r3, #0]
 
-	// STEP 4: Set GPIO15 function to SIO
-	ldr  r3, =0x4002807c  // IO_BANK0 + GPIO15_CTRL
+	// STEP 4: Set GPIO25 function to SIO
+	ldr  r3, =0x400280cc  // IO_BANK0 + GPIO25_CTRL
 	movs r2, #5           // Function 5 = SIO
 	str  r2, [r3, #0]
 
 	// STEP 5: Enable output and start blinking
 	ldr  r0, =0xd0000000  // SIO_BASE
-	ldr  r1, =(1 << 15)   // GPIO15 mask
+	ldr  r1, =(1 << 25)   // GPIO25 mask
 	str  r1, [r0, #0x038] // GPIO_OE_SET
 
 // Main blink loop
@@ -76,7 +76,7 @@ _blink_loop:
 
 // Delay function
 _delay:
-	ldr  r2, =2000000
+	ldr  r2, =500000
 _delay_loop:
 	subs r2, r2, #1
 	bne  _delay_loop
