@@ -21,7 +21,9 @@ vector_table_first:
 image_def_first:
     .word 0xffffded3      // BLOCK_MARKER_START
     .word 0x10010142      // IMAGE_TYPE: ARM executable for RP2350
-    .word 0x000001ff      // LAST item (type=0xff, size=2 words: IMAGE_TYPE + VECTOR_TABLE)
+    .word 0x00000203      // VECTOR_TABLE item (type=0x03, size=2 words)
+    .word vector_table_first  // Address of first vector table
+    .word 0x000003ff      // LAST item (type=0xff, size=3 words: IMAGE_TYPE 1 + VECTOR_TABLE 2)
     .word image_def_second - image_def_first  // LINK: byte offset to next block
     .word 0xab123579      // BLOCK_MARKER_END
 
@@ -29,14 +31,16 @@ image_def_first:
 .align 8
 vector_table_second:
     .word 0x20042000      // Initial stack pointer
-    .word second_entry + 1 // Reset handler (+1 for Thumb mode)
+    .word first_entry + 1 // Reset handler (+1 for Thumb mode)
     .word 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0  // Other vectors
 
 .align 4
 image_def_second:
     .word 0xffffded3      // BLOCK_MARKER_START
     .word 0x10010142      // IMAGE_TYPE: ARM executable for RP2350
-    .word 0x000001ff      // LAST item (type=0xff, size=2 words: IMAGE_TYPE + VECTOR_TABLE)
+    .word 0x00000203      // VECTOR_TABLE item (type=0x03, size=2 words)
+    .word vector_table_second  // Address of second vector table
+    .word 0x000003ff      // LAST item (type=0xff, size=3 words: IMAGE_TYPE 1 + VECTOR_TABLE 2)
     .word (image_def_first - image_def_second) & 0xFFFFFFFF  // LINK: byte offset back
     .word 0xab123579      // BLOCK_MARKER_END
 
