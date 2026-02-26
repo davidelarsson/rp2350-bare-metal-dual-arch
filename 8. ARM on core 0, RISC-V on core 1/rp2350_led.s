@@ -6,8 +6,6 @@
 .cpu cortex-m33
 .thumb
 
-// ARM IMAGE_DEF format is different from RISC-V
-// ARM expects vector table immediately after IMAGE_DEF (no VECTOR_TABLE item needed)
 .section .image_def, "a"
     .word 0xffffded3      // BLOCK_MARKER_START
     .word 0x10010142      // IMAGE_TYPE: ARM executable for RP2350
@@ -41,28 +39,10 @@ vector_table:
     .word 0               // PendSV
     .word 0               // SysTick
 
-// =============================================================================
-// RISC-V CODE SECTION FOR CORE 1
-// =============================================================================
-.section .text.riscv, "ax"
-.align 4
-.global core1_riscv_entry
-core1_riscv_entry:
-    // Include the separately assembled RISC-V binary
-    .incbin "build/core1_riscv.bin"
-
 .section .text, "ax"
 .thumb_func
 .global _start
 _start:
-    // Check which core we are on
-    // For ARM, read SIO CPUID register at 0xd0000000
-    ldr r0, =0xd0000000   // SIO_BASE
-    ldr r0, [r0]          // Read CPUID (offset 0x000)
-    cmp r0, #0
-    bne core1_entry       // If core 1, branch to core 1 code
-
-core0_init:
     // Initialize stack pointer for core 0
     ldr sp, =0x20042000
 
@@ -96,22 +76,44 @@ core0_init:
     ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x38]   // GPIO_OE_SET offset
 
-    // TEST: Set GPIO HIGH immediately
+    // Set GPIO HIGH initially
+    // This is not visible, since core 1 will immediately take control 
+    // and start blinking.
     ldr r0, =0xd0000000   // SIO_BASE
     ldr r1, =0x02000000   // Bit 25
     str r1, [r0, #0x18]   // GPIO_OUT_SET
 
-    // Delay
-    ldr r0, =10000000
-    bl delay
+    // Reset Core 1 using PSM FRCE_OFF so it samples the new ARCHSEL setting
+    // PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
+    ldr r0, =0x40018004   // PSM_FRCE_OFF
+    ldr r1, =0x01000000   // Bit 24 (PROC1)
+    str r1, [r0]          // Force Core 1 into reset
 
-    // Launch Core 1
-    ldr r4, =0xd0000000   // SIO_BASE
-    ldr r5, =core1_vector_table
-    ldr r6, =core1_entry
-    ldr r7, =0x20040000   // Core 1 stack pointer
-    mov r8, #0            // Sequence counter
-    mov r9, #0            // Launch counter (0=first, 1=second)
+    // Set Core 1 to RISC-V architecture
+    // ARCHSEL is sampled by core 1 on reset.
+    ldr r0, =0x40120158   // OTP_ARCHSEL
+    mov r1, #0x00000002   // Set bit 1 for Core 1 = RISC-V
+    str r1, [r0]
+
+     // Wait a bit
+//    ldr r0, =100000
+//    bl delay
+
+    // Release Core 1 from reset by clearing the bit
+    ldr r0, =0x40018004   // PSM_FRCE_OFF
+    mov r1, #0
+    str r1, [r0]
+
+    // Wait for reset to complete
+//    ldr r0, =1000000
+//    bl delay
+
+    // Launch Core 1 with RISC-V code
+    ldr r4, =0xd0000000          // SIO_BASE
+    ldr r5, =0x20040000          // Stack pointer (not really used by RISC-V protocol)
+    ldr r6, =core1_riscv_entry   // RISC-V entry point
+    ldr r7, =0x20040000          // Core 1 stack pointer
+    mov r8, #0                   // Sequence counter
 
 // Send handshake sequence to wake core 1
 launch_loop:
@@ -148,16 +150,15 @@ send_1:
     b do_send
 
 send_vt:
-    mov r2, r5            // vector_table address
+    mov r2, r5            // stack pointer (protocol expects this position)
     b do_send
 
 send_sp:
-    mov r2, r7            // stack pointer
+    mov r2, r7            // stack pointer again
     b do_send
 
 send_entry:
-    mov r2, r6            // entry point (with Thumb bit set)
-    orr r2, r2, #1        // Set bit 0 for Thumb mode
+    mov r2, r6            // entry point (RISC-V doesn't need Thumb bit)
 
 do_send:
     // Wait for FIFO ready
@@ -190,59 +191,7 @@ wait_response:
     cmp r8, #6
     bne launch_loop       // Continue if not done
 
-    // Core 1 launched successfully!
-    // Check if this is the second launch
-    cmp r9, #1
-    beq core0_main        // If second launch, enter infinite loop
-
-    // First launch complete - wait longer than Core 1's delay (2x = 10000000)
-    ldr r0, =10000000
-    bl delay
-
-    // Set GPIO HIGH again before resetting Core 1
-    ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x02000000   // Bit 25
-    str r1, [r0, #0x18]   // GPIO_OUT_SET
-
-    // Keep it HIGH for a visible duration (same as Core 1's delay)
-    ldr r0, =5000000
-    bl delay
-
-    // Switch Core 1 to RISC-V architecture
-    // OTP_ARCHSEL = 0x40120158
-    // Bit 1 = Core 1 architecture (0=ARM, 1=RISC-V)
-    ldr r0, =0x40120158   // OTP_ARCHSEL
-    mov r1, #0x00000002   // Set bit 1 for Core 1 = RISC-V
-    str r1, [r0]
-
-    // Reset Core 1 using PSM FRCE_OFF register
-    // PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
-    ldr r0, =0x40018004   // PSM_FRCE_OFF
-    ldr r1, =0x01000000   // Bit 24 (PROC1)
-    str r1, [r0]          // Force Core 1 into reset
-
-    // Wait a bit
-    ldr r0, =100000
-    bl delay
-
-    // Release Core 1 from reset by clearing the bit
-    ldr r0, =0x40018004   // PSM_FRCE_OFF
-    mov r1, #0
-    str r1, [r0]
-
-    // Wait for reset to complete
-    ldr r0, =1000000
-    bl delay
-
-    // Now launch Core 1 again with RISC-V entry point
-    ldr r4, =0xd0000000          // SIO_BASE
-    ldr r5, =core1_vector_table  // Not used for RISC-V, but keep for protocol
-    ldr r6, =core1_riscv_entry   // RISC-V entry point
-    ldr r7, =0x20040000          // Core 1 stack pointer
-    mov r8, #0                   // Sequence counter
-    mov r9, #1                   // Mark as second launch
-    b launch_loop                // Reuse the same launch loop
-
+    // Core 1 launched successfully - stay in infinite loop
 core0_main:
     b core0_main
 
@@ -251,50 +200,19 @@ reset_seq:
     mov r8, #0
     b launch_loop
 
-.thumb_func
-delay:
-    subs r0, r0, #1
-    bne delay
-    bx lr
+//.thumb_func
+//delay:
+//    subs r0, r0, #1
+//    bne delay
+//    bx lr
 
-// CORE 1: Entry point
-.thumb_func
+// =============================================================================
+// RISC-V CODE SECTION FOR CORE 1
+// =============================================================================
+.section .text.riscv, "ax"
 .align 4
-core1_entry:
-    // Core 1 starts here
-    b core1_main
+.global core1_riscv_entry
+core1_riscv_entry:
+    // Include the separately assembled RISC-V binary
+    .incbin "build/core1_riscv.bin"
 
-.thumb_func
-.align 4
-core1_main:
-    // Initialize stack pointer
-    ldr sp, =0x20040000
-
-    // Set GPIO LOW immediately (no delay)
-    ldr r4, =0xd0000000   // SIO_BASE
-    ldr r5, =0x02000000   // Bit 25
-    str r5, [r4, #0x20]   // GPIO_OUT_CLR
-
-    // Stay in endless loop
-core1_done:
-    b core1_done
-
-// CORE 1: Vector table
-.align 8
-core1_vector_table:
-    .word 0x20040000      // Initial stack pointer for core 1
-    .word core1_entry + 1 // Reset handler (+1 for Thumb)
-    .word 0               // NMI
-    .word 0               // HardFault
-    .word 0               // MemManage
-    .word 0               // BusFault
-    .word 0               // UsageFault
-    .word 0
-    .word 0
-    .word 0
-    .word 0
-    .word 0
-    .word 0
-    .word 0
-    .word 0
-    .word 0

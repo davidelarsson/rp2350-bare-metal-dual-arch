@@ -217,20 +217,30 @@ Detailed descriptions of `IMAGE_DEF` items can be found in the source for this
 example.
 
 
-# 8. Dual-architecture, ARM boot on core 0, RISC-V on core 1
+# 8. ARM on core 0, RISC-V on core 1
 First example of actually running both ARM and RISC-V code simultaneously
 
 ARM boots on core 0, RISC-V runs on core 1.
 
-TODO: Explain!
+First we assemble the RISC-V code. Then the ARM source code includes the
+generated binary using the `incbin` directive.
+
+`ARCHSEL` determines what architecture each core should use and is sampled on
+reset, so we update the register to RISC-V for core 1, then reset core 1.
+
+This will boot core 1 into its RISC-V version of `wait_for_vector_table`.
+Thus we can launch core 1 as usual, and point it to the included RISC-V
+binary.
+
+Just like in examples 4 and 5, core 0 sets up the pin and core 1 does
+the blinking.
 
 
-
-# 9. Dual-architecture, RISC-V boot on core 0, ARM on core 1
+# 9. RISC-V on core 0, ARM on core 1
 Similar to example 8, but reversed: RISC-V boots on core 0, ARM runs on core 1.
 
+Thus `ARCHSEL` is set to ARM for core 1 before core 1 is reset.
 
-TODO: Explain!
 
 
 
