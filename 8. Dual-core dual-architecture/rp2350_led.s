@@ -41,6 +41,29 @@ vector_table:
     .word 0               // PendSV
     .word 0               // SysTick
 
+// =============================================================================
+// RISC-V CODE SECTION FOR CORE 1
+// =============================================================================
+.section .text.riscv, "ax"
+.align 4
+.global core1_riscv_entry
+core1_riscv_entry:
+    // RISC-V instructions encoded as ARM .word directives
+    // li sp, 0x20040000 - Load immediate into stack pointer
+    .word 0x200407b7    // lui sp, 0x20040
+    
+    // li t0, 0xd0000000 - Load SIO_BASE
+    .word 0xd00002b7    // lui t0, 0xd0000
+    
+    // li t1, 0x8000 - Load bit 15
+    .word 0x00008337    // lui t1, 0x8
+    
+    // sw t1, 0x20(t0) - Store to GPIO_OUT_CLR
+    .word 0x0262a023    // sw t1, 32(t0)
+    
+    // j core1_riscv_loop - Jump to self (infinite loop)
+    .word 0x0000006f    // j 0 (relative jump to self)
+
 .section .text, "ax"
 .thumb_func
 .global _start
@@ -201,9 +224,9 @@ wait_response:
     // Switch Core 1 to RISC-V architecture
     // OTP_ARCHSEL = 0x40120158
     // Bit 1 = Core 1 architecture (0=ARM, 1=RISC-V)
-    //ldr r0, =0x40120158   // OTP_ARCHSEL
-    //mov r1, #0x00000002   // Set bit 1 for Core 1 = RISC-V
-    //str r1, [r0]
+    ldr r0, =0x40120158   // OTP_ARCHSEL
+    mov r1, #0x00000002   // Set bit 1 for Core 1 = RISC-V
+    str r1, [r0]
 
     // Reset Core 1 using PSM FRCE_OFF register
     // PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
@@ -224,14 +247,14 @@ wait_response:
     ldr r0, =1000000
     bl delay
 
-    // Now launch Core 1 again (reset sequence counter)
-    ldr r4, =0xd0000000   // SIO_BASE
-    ldr r5, =core1_vector_table
-    ldr r6, =core1_entry
-    ldr r7, =0x20040000   // Core 1 stack pointer
-    mov r8, #0            // Sequence counter
-    mov r9, #1            // Mark as second launch
-    b launch_loop         // Reuse the same launch loop
+    // Now launch Core 1 again with RISC-V entry point
+    ldr r4, =0xd0000000          // SIO_BASE
+    ldr r5, =core1_vector_table  // Not used for RISC-V, but keep for protocol
+    ldr r6, =core1_riscv_entry   // RISC-V entry point
+    ldr r7, =0x20040000          // Core 1 stack pointer
+    mov r8, #0                   // Sequence counter
+    mov r9, #1                   // Mark as second launch
+    b launch_loop                // Reuse the same launch loop
 
 core0_main:
     b core0_main
