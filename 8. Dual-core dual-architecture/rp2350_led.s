@@ -101,6 +101,7 @@ core0_init:
     ldr r6, =core1_entry
     ldr r7, =0x20040000   // Core 1 stack pointer
     mov r8, #0            // Sequence counter
+    mov r9, #0            // Launch counter (0=first, 1=second)
 
 // Send handshake sequence to wake core 1
 launch_loop:
@@ -180,6 +181,58 @@ wait_response:
     bne launch_loop       // Continue if not done
 
     // Core 1 launched successfully!
+    // Check if this is the second launch
+    cmp r9, #1
+    beq core0_main        // If second launch, enter infinite loop
+
+    // First launch complete - wait longer than Core 1's delay (2x = 10000000)
+    ldr r0, =10000000
+    bl delay
+
+    // Set GPIO HIGH again before resetting Core 1
+    ldr r0, =0xd0000000   // SIO_BASE
+    ldr r1, =0x8000       // Bit 15
+    str r1, [r0, #0x18]   // GPIO_OUT_SET
+
+    // Keep it HIGH for a visible duration (same as Core 1's delay)
+    ldr r0, =5000000
+    bl delay
+
+    // Switch Core 1 to RISC-V architecture
+    // OTP_ARCHSEL = 0x40120158
+    // Bit 1 = Core 1 architecture (0=ARM, 1=RISC-V)
+    //ldr r0, =0x40120158   // OTP_ARCHSEL
+    //mov r1, #0x00000002   // Set bit 1 for Core 1 = RISC-V
+    //str r1, [r0]
+
+    // Reset Core 1 using PSM FRCE_OFF register
+    // PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
+    ldr r0, =0x40018004   // PSM_FRCE_OFF
+    ldr r1, =0x01000000   // Bit 24 (PROC1)
+    str r1, [r0]          // Force Core 1 into reset
+
+    // Wait a bit
+    ldr r0, =100000
+    bl delay
+
+    // Release Core 1 from reset by clearing the bit
+    ldr r0, =0x40018004   // PSM_FRCE_OFF
+    mov r1, #0
+    str r1, [r0]
+
+    // Wait for reset to complete
+    ldr r0, =1000000
+    bl delay
+
+    // Now launch Core 1 again (reset sequence counter)
+    ldr r4, =0xd0000000   // SIO_BASE
+    ldr r5, =core1_vector_table
+    ldr r6, =core1_entry
+    ldr r7, =0x20040000   // Core 1 stack pointer
+    mov r8, #0            // Sequence counter
+    mov r9, #1            // Mark as second launch
+    b launch_loop         // Reuse the same launch loop
+
 core0_main:
     b core0_main
 
