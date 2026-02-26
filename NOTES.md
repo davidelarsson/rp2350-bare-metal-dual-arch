@@ -1,13 +1,19 @@
-# Raspberry Pi Pico 2W
-Some experiments.
+# Raspberry Pi Pico 2
+The device is based on a RP2350 microcontroller, which sports both an ARM and a RISC-V CPU,
+both dual-core.
+
+The architecture to be used is configured at boot, but the SDK only supports one architecture
+at a time. Our goal is to run both architectures simultaneously, one core of each architecture.
+
+This is achieved in examples 8 and 9.
 
 
 # TODO
 
  * Go through everything and clean it up
 
+
 # Overview
-The goal is to run two cores with different architectures simultaneously. This is achieved in examples 8 and 9.
 In order to get there, I went through several steps:
 
  * `1. Blink LED and print to serial terminal`
@@ -27,10 +33,10 @@ In order to get there, I went through several steps:
  * `5. Dual-core RISC-V`
   - Running RISC-V assembly code on both cores using bare-metal coding
 
- * `6. Dual-core multi-image ARM`
+ * `6. Multi-image ARM`
   - Useless but interesting example on how `IMAGE_DEF`s work with ARM
 
- * `7. Dual-core multi-image RISC-V`
+ * `7. Multi-image RISC-V`
   - Useless but interesting example on how `IMAGE_DEF`s work with RISC-V
 
  * `8. Dual-architecture, ARM boot on core 0, RISC-V on core 1`
@@ -43,17 +49,16 @@ In order to get there, I went through several steps:
 
 
 # 1. Blink LED and print to serial terminal
-Simple getting started program.
+Simple getting started program. Both ARM and RISC-V are supported.
 
 
-
-# On mac; install GCC for both ARM and RISC-V
+## Instructions on MacOS
 `brew install --cask gcc-arm-embedded`
 `brew install riscv64-elf-gcc`
 
 There is a slight inconvenience on Mac. The SDK looks for `riscv32-unknown-elf-*`,
 but `brew` installs `riscv64-unknown-elf-*`. The binaries are fine, they can
-generate 32-bit code, but we have to create a few symlinks:
+generate 32-bit code, but we have to create a few symlinks for the SDK to find them:
 ```bash
 cd /opt/homebrew/bin
 for tool in riscv64-unknown-elf-*; do
@@ -69,29 +74,164 @@ Now, build the first project:
 cd "1. Blink LED and print to serial terminal"
 mkdir build
 cd build
-cmake .. -DPICO_BOARD=pico2_w -DPICO_SDK_FETCH_FROM_GIT=ON
+cmake .. -DPICO_BOARD=pico2 -DPICO_SDK_FETCH_FROM_GIT=ON
 make
 ```
-CMake options:
+CMake options explanations:
 
 `DPICO_BOARD=pico2_w` defines the board used and
 `-DPICO_SDK_FETCH_FROM_GIT=ON` tells cmake to fetch the SDK from GitHub.
 
 Copy the `blink.uf2` file to the controller to verify that everything works.
 
-You can run the first example again, but this time add:
+### RISC-V
+Configure and compile the first example again, but this time add:
 `-DPICO_PLATFORM=rp2350-riscv`
 To the CMake command. This will build the example using the RISC-V cores instead.
 
+```bash
+cd "1. Blink LED and print to serial terminal"
+mkdir build
+cd build
+cmake .. -DPICO_PLATFORM=rp2350-riscv -DPICO_BOARD=pico2 -DPICO_SDK_FETCH_FROM_GIT=ON
+make
+```
+Again, copy `blink.uf2` to the RP2350 and it will do the exact same thing as before,
+only running on a RISC-V core.
+
 
 # 2. Bare metal ARM
-`2. Bare metal ARM` blinks an LED on GPIO15 using bare metal code.
+Blink an LED, but using bare-metal coding without the SDK.
 
-Two versions are included, one for Flash, the other for SRAM that disappears after a power cycle.
+On my mac, all I need to do is:
+```bash
+make
+make upload
+```
+The last command copies the `blink.uf2` to `/Volumes/RP2350`, which resets the
+controller and boots the program. It blinks with a frequency of about 0.5 Hz.
+
+An image to be recognized as valid by the RP2350 must start with an `IMAGE_DEF`
+definition. ARM also requires a so-called `vector table` which must be following
+immediatedly after the `IMAGE_DEF`. One can also include an `VECTOR_TABLE` item
+in the image definition to point out where the vector table is found. An example
+of this can be found in `6. Multi-image ARM`. The vector table defines
+things like entry point, initial stack pointer value and other things.
+
+## RAM version
+A separate version of the source, called `rp2350_led_ram.s` that blinks the LED with a
+much higher frequency, 2-3 Hz or so. This is to make it clear which version of the
+blinking program that is currently running.
+
+```bash
+make -f Makefile.ram
+make -f Makefile.ram  upload
+```
+This does not upload the code to Flash, but only to SRAM. So it will only stay in
+memory until the device is power-cycled.
+
+Thus, when you power-cycle the device, it goes back to blink with the slower
+frequency again.
 
 
 # 3. Bare metal RISC-V
-`3. Bare metal RISC-V` works the same as 2, but using the RISC-V CPU instead.
+Blink an LED, just like example 2, but using bare-metal RISC-V assembly.
+
+```bash
+make
+make upload
+```
+
+RISC-V does not use `vector table`s like ARM. As such, the entry point for the
+image must be provided by other means. For the RP2350, it is done by including
+an `ENTRY_POINT` item in the image definition. `ENTRY_POINT` also defines the
+initial value of the stack pointer.
+
+If there is a `VECTOR_TABLE` item in the image definition for a RISC-V, image
+definition, it will be ignored (see `5.9.3.3. VECTOR_TABLE item`).
+
+
+# 4. Dual-core ARM
+Boot the second core, but stick to ARM for both cores.
+
+Core 1 boots into a `wait_for_vector` function that sleep-waits for relevant data
+to be sent from core 0 over the FIFO. When core 1 receives the correct sequence of data,
+t will jump to the entry address sent by Core 0. The source of the `wait_for_vector`
+function is documented in `https://github.com/raspberrypi/pico-bootrom-rp2350`.
+
+Note that there are two different `wait_for_vector` functions for ARM and RISC-V, but
+they work exactly the same.
+
+So in this example, core 0 configures the I/O pin and core 1 does the actual blinking.
+
+Core 0 sets the LED high, and waits a second or so, then launches core 1.
+Core 1 starts the blinking.
+
+
+# 5. Dual-core RISC-V
+Same as example 4, but running both cores of the RISC-V CPU instead.
+
+This example includes more details on how the second core is actually booted.
+
+This contains the first instance of the hilarious Hazard3 hack:
+In order to wake the other core up, you need to execute an `h3.unblock` instruction.
+This is mapped to a seemingly random RISC-V opcode that would otherwise be a NOP:
+`slt x0, x0, x1`
+Since x0 is always zero, and any writes to it are ignored, this is always a NOP.
+However, the RP2350 bootrom treats this instruction as a special signal to unblock
+the other core.
+
+
+# 6. Multi-image ARM
+Experiment with setting up multiple `IMAGE_DEF`s.
+
+Not used in the end, but can serve as an interesting demonstration nevertheless.
+
+I wrote this because I mistakenly thought I had to upload two different images, one
+for ARM, the other for RISC-V and then boot one image per core. This is now how it
+works however, but I leave it here anyway.
+
+The first image just turns on the LED and lets it stay on. The second image
+blinks the LED. It is always the last image in the loop that is booted by bootrom.
+
+TODO: Why is that? How do we boot another image?
+
+Examples of `VECTOR_TABLE` items in the image definitions are included. Again,
+the second image is booted, which uses the second vector table. In order to start
+the code that the first vector table refers to, update the pointer to the vector
+table of the second image:
+```
+    .word vector_table_second  // Address of second vector table
+```
+so that it points to `vector_table_first` instead.
+
+
+
+# 7. Multi-image RISC-V
+Same as example 6, but running RISC-V instead.
+
+Note that the image definitions don't include `VECTOR_TABLE` items (since that is
+only used by ARM), but instead use `ENTRY_POINT` items.
+
+Detailed descriptions of `IMAGE_DEF` items can be found in the source for this
+example.
+
+
+# 8. Dual-architecture, ARM boot on core 0, RISC-V on core 1
+First example of actually running both ARM and RISC-V code simultaneously
+
+ARM boots on core 0, RISC-V runs on core 1.
+
+TODO: Explain!
+
+
+
+# 9. Dual-architecture, RISC-V boot on core 0, ARM on core 1
+Similar to example 8, but reversed: RISC-V boots on core 0, ARM runs on core 1.
+
+
+TODO: Explain!
+
 
 
 
