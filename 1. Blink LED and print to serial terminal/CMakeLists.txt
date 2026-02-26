@@ -18,7 +18,6 @@ add_executable(blink
 # Link libraries
 target_link_libraries(blink
     pico_stdlib
-    pico_cyw43_arch_none
 )
 
 # Enable USB output, disable UART output

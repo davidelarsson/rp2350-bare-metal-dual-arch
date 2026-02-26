@@ -1,29 +1,29 @@
 #include "pico/stdlib.h"
-#include "pico/cyw43_arch.h"
 #include <stdio.h>
+
+// Pico 2 has onboard LED on GPIO25
+#define LED_PIN 25
 
 int main() {
     stdio_init_all();
     
-    // Initialize the CYW43 wireless chip (controls the LED on Pico W)
-    if (cyw43_arch_init()) {
-        printf("Failed to initialize CYW43\n");
-        return -1;
-    }
+    // Initialize GPIO25 for the onboard LED
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
 
-    printf("Pico 2W Blink Example\n");
-    printf("LED blinking at 1Hz...\n");
+    printf("Pico 2 Blink Example\n");
+    printf("LED blinking at 1Hz on GPIO25...\n");
 
     // Blink forever
     while (true) {
         printf("LED ON\n");
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        gpio_put(LED_PIN, 1);
         sleep_ms(500);
         printf("LED OFF\n");
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        gpio_put(LED_PIN, 0);
         sleep_ms(500);
     }
     
-    cyw43_arch_deinit();
     return 0;
 }
+
