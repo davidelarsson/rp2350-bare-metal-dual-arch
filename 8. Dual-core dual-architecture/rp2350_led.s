@@ -48,21 +48,8 @@ vector_table:
 .align 4
 .global core1_riscv_entry
 core1_riscv_entry:
-    // RISC-V instructions encoded as ARM .word directives
-    // li sp, 0x20040000 - Load immediate into stack pointer
-    .word 0x200407b7    // lui sp, 0x20040
-    
-    // li t0, 0xd0000000 - Load SIO_BASE
-    .word 0xd00002b7    // lui t0, 0xd0000
-    
-    // li t1, 0x8000 - Load bit 15
-    .word 0x00008337    // lui t1, 0x8
-    
-    // sw t1, 0x20(t0) - Store to GPIO_OUT_CLR
-    .word 0x0262a023    // sw t1, 32(t0)
-    
-    // j core1_riscv_loop - Jump to self (infinite loop)
-    .word 0x0000006f    // j 0 (relative jump to self)
+    // Include the separately assembled RISC-V binary
+    .incbin "build/core1_riscv.bin"
 
 .section .text, "ax"
 .thumb_func
