@@ -1,6 +1,6 @@
 # RP2350 Dual-Core RISC-V Test
-# Core 0: Initialize GPIO15 and launch Core 1
-# Core 1: Set GPIO15 HIGH and stay in infinite loop
+# Core 0: Initialize GPIO25 and launch Core 1
+# Core 1: Set GPIO25 HIGH and stay in infinite loop
 
 .section .image_def, "a"
     .word 0xffffded3  # BLOCK_MARKER_START
@@ -67,24 +67,24 @@ core0_init:
     and t1, t1, t2
     bne t1, t2, 1b
 
-    # Configure GPIO15 pad
-    li t0, 0x40038040      # PADS_BANK0 + GPIO15
+    # Configure GPIO25 pad
+    li t0, 0x40038068      # PADS_BANK0 + GPIO25
     li t1, 0x56
     sw t1, 0(t0)
 
-    # Set GPIO15 function to SIO
-    li t0, 0x4002807c      # IO_BANK0 + GPIO15_CTRL
+    # Set GPIO25 function to SIO
+    li t0, 0x400280cc      # IO_BANK0 + GPIO25_CTRL
     li t1, 5               # Function 5 (SIO)
     sw t1, 0(t0)
 
-    # Enable GPIO15 output
+    # Enable GPIO25 output
     li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x8000          # Bit 15
+    li t1, 0x02000000      # Bit 25
     sw t1, 0x38(t0)        # GPIO_OE_SET
 
     # TEST: Set GPIO HIGH immediately to confirm hardware works
     li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x8000          # Bit 15
+    li t1, 0x02000000      # Bit 25
     sw t1, 0x18(t0)        # GPIO_OUT_SET
     
     # Delay so we can see it
@@ -215,7 +215,7 @@ core1_main:
 
     # Core 1: Blink LED at constant rate
     li s0, 0xd0000000      # SIO_BASE
-    li s1, 0x8000          # Bit 15 for GPIO15
+    li s1, 0x02000000      # Bit 25 for GPIO25
 
 core1_blink_loop:
     # Turn LED ON
