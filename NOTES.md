@@ -10,7 +10,9 @@ This is achieved in examples 8 and 9.
 
 # TODO
 
- * Go through everything and clean it up
+ * Do UART
+
+ * Test the programmable I/O logic
 
 
 # Overview
@@ -194,7 +196,10 @@ works however, but I leave it here anyway.
 The first image just turns on the LED and lets it stay on. The second image
 blinks the LED. It is always the last image in the loop that is booted by bootrom.
 
-TODO: Why is that? How do we boot another image?
+(There seems to be no way to tell the bootrom to boot another image in a block loop
+without creating a custom bootloader in the last image. In order to boot other
+images, you must use a higher-level abstraction in the form of partitions. We have
+not experimented with that.)
 
 Examples of `VECTOR_TABLE` items in the image definitions are included. Again,
 the second image is booted, which uses the second vector table. In order to start
