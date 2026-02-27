@@ -32,13 +32,26 @@ core1_entry:
     // Initialize stack pointer for ARM Core 1
     ldr sp, =0x20040000
 
-    // Set GPIO25 LOW
-    // SIO_BASE = 0xd0000000
-    // GPIO_OUT_CLR offset = 0x20
-    ldr r0, =0xd0000000   // SIO_BASE
-    ldr r1, =0x02000000   // Bit 25
-    str r1, [r0, #0x20]   // GPIO_OUT_CLR
+    // Blink LED
+    ldr r4, =0xd0000000   // SIO_BASE
+    ldr r5, =0x02000000   // Bit 25 for GPIO25
 
-    // Stay in endless loop
-1:
-    b 1b
+blink_loop:
+    // Turn LED ON
+    str r5, [r4, #0x18]   // GPIO_OUT_SET
+    
+    ldr r0, =1000000
+    bl delay
+
+    // Turn LED OFF
+    str r5, [r4, #0x20]   // GPIO_OUT_CLR
+    
+    ldr r0, =1000000
+    bl delay
+    
+    b blink_loop
+
+delay:
+    subs r0, r0, #1
+    bne delay
+    bx lr

@@ -15,11 +15,6 @@
 .section .text, "ax"
 .global _start
 _start:
-    # Check which core we are
-    csrr t0, mhartid
-    bnez t0, core1_entry   # If core 1, branch to core 1 code
-
-core0_init:
     # Initialize stack pointer for core 0
     li sp, 0x20042000
 
@@ -52,22 +47,38 @@ core0_init:
     li t1, 0x02000000      # Bit 25
     sw t1, 0x38(t0)        # GPIO_OE_SET
 
-    # Set GPIO HIGH
+    # Set GPIO HIGH initially
     li t0, 0xd0000000      # SIO_BASE
     li t1, 0x02000000      # Bit 25
     sw t1, 0x18(t0)        # GPIO_OUT_SET
 
-    # Small delay so we can see the HIGH
-    li a0, 5000000
-    call delay
+    # Delay to show initial state
+#    li a0, 5000000
+#    call delay
 
-    # Launch Core 1 (first time with RISC-V)
+    # Set Core 1 to ARM architecture
+    # ARCHSEL must be set BEFORE releasing Core 1 from reset
+    li t0, 0x40120158      # OTP_ARCHSEL
+    li t1, 0x00000000      # Clear bit 1 for Core 1 = ARM
+    sw t1, 0(t0)
+
+    # Reset Core 1 using PSM FRCE_OFF so it samples the new ARCHSEL setting
+    # PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
+    li t0, 0x40018004      # PSM_FRCE_OFF
+    li t1, 0x01000000      # Bit 24 (PROC1)
+    sw t1, 0(t0)           # Force Core 1 into reset
+
+    # Release Core 1 from reset by clearing the bit
+    li t0, 0x40018004      # PSM_FRCE_OFF
+    li t1, 0
+    sw t1, 0(t0)
+
+    # Launch Core 1 with ARM code
     li s0, 0xd0000000      # SIO_BASE
-    la s1, core1_vector_table
-    la s2, core1_entry
+    la s1, core1_arm_entry # ARM vector table address
+    la s2, core1_arm_entry # ARM entry point is the vector table address
     li s3, 0x20040000      # Core 1 stack pointer
     li s4, 0               # Sequence counter
-    li s5, 0               # Launch counter (0=first, 1=second)
 
 launch_loop:
     # Determine which value to send
@@ -104,18 +115,15 @@ send_1:
     j do_send
 
 send_vt:
-    mv t2, s1
+    mv t2, s1              # Vector table address (for ARM)
     j do_send
 
 send_sp:
-    mv t2, s3
+    mv t2, s3              # Stack pointer
     j do_send
 
 send_entry:
-    mv t2, s2
-    # If this is the second launch (ARM), set Thumb bit (bit 0)
-    li t0, 1
-    bne s5, t0, do_send    # Skip if first launch (RISC-V)
+    mv t2, s2              # Entry point
     ori t2, t2, 1          # Set bit 0 for ARM Thumb mode
 
 do_send:
@@ -148,71 +156,7 @@ wait_response:
     li t0, 6
     bne s4, t0, launch_loop
 
-    # Core 1 launched successfully!
-    # Check if this is the second launch
-    li t0, 1
-    beq s5, t0, core0_main
-
-    # First launch complete - wait longer than Core 1's delay
-    li a0, 10000000
-    call delay
-
-    # Set GPIO HIGH again before resetting Core 1
-    li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x02000000      # Bit 25
-    sw t1, 0x18(t0)        # GPIO_OUT_SET
-
-    # Keep it HIGH for a visible duration
-    li a0, 5000000
-    call delay
-
-    # Switch Core 1 to ARM architecture
-    # OTP_ARCHSEL = 0x40120158
-    # Bit 1 = Core 1 architecture (0=ARM, 1=RISC-V)
-    li t0, 0x40120158      # OTP_ARCHSEL
-    li t1, 0x00000000      # Clear bit 1 for Core 1 = ARM
-    sw t1, 0(t0)
-
-    # Reset Core 1 using PSM FRCE_OFF register
-    # PSM_BASE = 0x40018000, FRCE_OFF offset = 0x4
-    li t0, 0x40018004      # PSM_FRCE_OFF
-    li t1, 0x01000000      # Bit 24 (PROC1)
-    sw t1, 0(t0)
-
-    # Wait a bit
-    li a0, 100000
-    call delay
-
-    # Release Core 1 from reset
-    li t0, 0x40018004      # PSM_FRCE_OFF
-    li t1, 0
-    sw t1, 0(t0)
-
-    # Wait for reset to complete
-    li a0, 1000000
-    call delay
-
-    # Drain FIFO before second launch
-    li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x50
-    add t1, t0, t1         # FIFO_ST address
-drain_fifo_before_relaunch:
-    lw t2, 0(t1)
-    andi t2, t2, 1         # Check VLD bit
-    beqz t2, fifo_drained
-    lw t3, 0x58(t0)        # Read and discard from FIFO_RD
-    j drain_fifo_before_relaunch
-fifo_drained:
-
-    # Now launch Core 1 again with ARM entry point
-    li s0, 0xd0000000      # SIO_BASE
-    la s1, core1_arm_entry # ARM vector table is at the start of ARM binary
-    la s2, core1_arm_entry # ARM entry point is also the vector table address
-    li s3, 0x20040000      # Core 1 stack pointer
-    li s4, 0               # Reset sequence counter
-    li s5, 1               # Mark as second launch
-    j launch_loop
-
+    # Core 1 launched successfully - stay in infinite loop
 core0_main:
     j core0_main
 
@@ -220,29 +164,10 @@ reset_seq:
     li s4, 0
     j launch_loop
 
-delay:
-    addi a0, a0, -1
-    bnez a0, delay
-    ret
-
-# CORE 1: RISC-V entry point
-core1_entry:
-    # Initialize stack pointer
-    li sp, 0x20040000
-
-    # Set GPIO LOW immediately
-    li t0, 0xd0000000      # SIO_BASE
-    li t1, 0x02000000      # Bit 25
-    sw t1, 0x20(t0)        # GPIO_OUT_CLR
-
-    # Stay in endless loop
-core1_done:
-    j core1_done
-
-# CORE 1: Vector table (not really used but part of protocol)
-.align 8
-core1_vector_table:
-    .word core1_entry
+#delay:
+#    addi a0, a0, -1
+#    bnez a0, delay
+#    ret
 
 # =============================================================================
 # ARM CODE SECTION FOR CORE 1
