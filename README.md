@@ -5,8 +5,6 @@ The SDK only supports one architecture at a time. This project demonstrates how 
 
 In order to get there, multiple intermediate steps were taken. The final goal was achieved in examples 8 and 9.
 
-Check out [NOTES.md](Notes.md) for details.
-
 
 # rp2350-bare-metal-dual-arch
 Bare-metal examples running ARM and RISC-V simultaneously on the RP2350.
